@@ -52,17 +52,12 @@ struct TernaryTime {
     static func tritsToDecimal(_ trits: [Int]) -> Int {
         trits.reduce(0) { $0 * 3 + $1 }
     }
-
-    /// Strips leading zero trits, keeping at least one trit.
-    static func stripLeadingZeros(_ trits: [Int]) -> [Int] {
-        let stripped = Array(trits.drop(while: { $0 == 0 }))
-        return stripped.isEmpty ? [0] : stripped
-    }
 }
 
 // MARK: - Main View
 
 struct ContentView: View {
+    @State private var showSettings = false
     @State private var showLeadingZeros = true
 
     var body: some View {
@@ -70,116 +65,136 @@ struct ContentView: View {
             from: TernaryTime.noonToday(),
             by: TernaryTime.ternarySecondDuration
         )) { context in
-            ClockFaceView(
-                time: TernaryTime.from(date: context.date),
-                showLeadingZeros: showLeadingZeros,
-                onToggleZeros: { showLeadingZeros.toggle() }
-            )
+            let time = TernaryTime.from(date: context.date)
+
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+
+                MainClockView(time: time, showLeadingZeros: showLeadingZeros)
+                    .onTapGesture(count: 2) {
+                        withAnimation { showSettings = true }
+                    }
+
+                if showSettings {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            withAnimation { showSettings = false }
+                        }
+
+                    SettingsCard(
+                        time: time,
+                        showLeadingZeros: $showLeadingZeros
+                    )
+                    .transition(.opacity)
+                }
+            }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .statusBarHidden(true)
+        .modifier(HideHomeIndicatorModifier())
     }
 }
 
-// MARK: - Clock Face
+// MARK: - Main Clock View
 
-struct ClockFaceView: View {
+/// Full-screen view showing only the ternary clock, perfectly centered.
+struct MainClockView: View {
     let time: TernaryTime
     let showLeadingZeros: Bool
-    let onToggleZeros: () -> Void
 
-    private static let hPadding: CGFloat = 16
-    private static let edgePad: CGFloat = 6
+    private let hPadding: CGFloat = 16
 
     var body: some View {
         GeometryReader { geo in
-            let layout = makeLayout(width: geo.size.width)
+            let layout = ClockLayout(availableWidth: geo.size.width, hPadding: hPadding)
 
-            VStack(spacing: 32) {
-                Spacer()
-
-                ClockDisplayCanvas(
-                    hours: layout.hours,
-                    minutes: layout.minutes,
-                    seconds: layout.seconds
-                )
-                .frame(height: layout.displayHeight)
-                .padding(.horizontal, Self.hPadding)
-
-                DecimalReadoutView(time: time)
-
-                Button(action: onToggleZeros) {
-                    Text(showLeadingZeros ? "Hide leading zeros" : "Show leading zeros")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
+            ClockDisplayCanvas(
+                hours: time.hours,
+                minutes: time.minutes,
+                seconds: time.seconds,
+                showLeadingZeros: showLeadingZeros
+            )
+            .frame(width: geo.size.width - 2 * hPadding, height: layout.displayHeight)
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
+        .ignoresSafeArea()
     }
+}
 
-    private func displayTrits(_ trits: [Int]) -> [Int] {
-        showLeadingZeros ? trits : TernaryTime.stripLeadingZeros(trits)
-    }
+// MARK: - Settings Card
 
-    private func makeLayout(width: CGFloat) -> ClockLayout {
-        let h = displayTrits(time.hours)
-        let m = displayTrits(time.minutes)
-        let s = displayTrits(time.seconds)
-        return ClockLayout(
-            hours: h, minutes: m, seconds: s,
-            availableWidth: width,
-            hPadding: Self.hPadding,
-            edgePad: Self.edgePad
-        )
+struct SettingsCard: View {
+    let time: TernaryTime
+    @Binding var showLeadingZeros: Bool
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ClockDisplayCanvas(
+                hours: time.hours,
+                minutes: time.minutes,
+                seconds: time.seconds,
+                showLeadingZeros: showLeadingZeros
+            )
+            .aspectRatio(11.0 / 3.0, contentMode: .fit)
+
+            DecimalReadoutView(time: time)
+
+            Divider()
+
+            Toggle("Leading zeros", isOn: $showLeadingZeros)
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: 500)
+        .padding(.horizontal, 32)
     }
 }
 
 // MARK: - Layout
 
 struct ClockLayout {
-    let hours: [Int]
-    let minutes: [Int]
-    let seconds: [Int]
     let displayHeight: CGFloat
 
-    init(hours: [Int], minutes: [Int], seconds: [Int],
-         availableWidth: CGFloat, hPadding: CGFloat, edgePad: CGFloat) {
-        self.hours = hours
-        self.minutes = minutes
-        self.seconds = seconds
+    /// Always 9 trits + 2 separators = 11 units.
+    private static let totalUnits: CGFloat = 11
 
+    init(availableWidth: CGFloat, hPadding: CGFloat) {
         let canvasWidth = availableWidth - 2 * hPadding
-        let tritCount = CGFloat(hours.count + minutes.count + seconds.count)
-        let totalUnits = tritCount + 2 // 2 separator units
-        let cellWidth = (canvasWidth - 2 * edgePad) / totalUnits
-        displayHeight = cellWidth * 3 // 1:3 cell aspect ratio
+        let roughCellWidth = canvasWidth / Self.totalUnits
+        let lineWidth = roughCellWidth * 0.15
+        let edgePad = lineWidth / 2 + 2
+        let cellWidth = (canvasWidth - 2 * edgePad) / Self.totalUnits
+        displayHeight = cellWidth * 3
     }
 }
 
 // MARK: - Clock Display Canvas
 
-/// Draws the entire clock (all trit groups and dot separators) in a single Canvas,
-/// eliminating clipping between groups.
+/// Draws the entire clock (all trit groups and dot separators) in a single Canvas.
+/// Layout is always 9 trits + 2 separators; when showLeadingZeros is false,
+/// leading zero trits are simply not drawn.
 struct ClockDisplayCanvas: View {
     let hours: [Int]
     let minutes: [Int]
     let seconds: [Int]
+    let showLeadingZeros: Bool
 
-    private let edgePad: CGFloat = 6
+    private let totalUnits: CGFloat = 11
 
     var body: some View {
         Canvas { context, size in
-            let tritCount = CGFloat(hours.count + minutes.count + seconds.count)
-            let totalUnits = tritCount + 2
+            let roughCellWidth = size.width / totalUnits
+            let lineWidth = roughCellWidth * 0.15
+            let edgePad = lineWidth / 2 + 2
             let cellWidth = (size.width - 2 * edgePad) / totalUnits
-            let lineWidth = cellWidth * 0.15
-            let vPad = lineWidth * 0.6
+            let actualLineWidth = cellWidth * 0.15
+            let vPad = actualLineWidth * 0.6
             let top = vPad
             let bottom = size.height - vPad
-            let dotSize = lineWidth * 1.2
-            let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+            let dotSize = actualLineWidth * 1.2
+            let style = StrokeStyle(lineWidth: actualLineWidth, lineCap: .round)
 
             var x = edgePad
 
@@ -199,21 +214,27 @@ struct ClockDisplayCanvas: View {
     private func drawTrits(_ trits: [Int], at startX: CGFloat, cellWidth: CGFloat,
                            top: CGFloat, bottom: CGFloat, style: StrokeStyle,
                            in context: GraphicsContext) -> CGFloat {
+        let firstSignificant = showLeadingZeros
+            ? 0
+            : (trits.firstIndex(where: { $0 != 0 }) ?? (trits.count - 1))
+
         var x = startX
-        for trit in trits {
-            var path = Path()
-            switch trit {
-            case 1: // /
-                path.move(to: CGPoint(x: x + cellWidth, y: top))
-                path.addLine(to: CGPoint(x: x, y: bottom))
-            case -1: // \
-                path.move(to: CGPoint(x: x, y: top))
-                path.addLine(to: CGPoint(x: x + cellWidth, y: bottom))
-            default: // |
-                path.move(to: CGPoint(x: x + cellWidth / 2, y: top))
-                path.addLine(to: CGPoint(x: x + cellWidth / 2, y: bottom))
+        for (i, trit) in trits.enumerated() {
+            if i >= firstSignificant {
+                var path = Path()
+                switch trit {
+                case 1:
+                    path.move(to: CGPoint(x: x + cellWidth, y: top))
+                    path.addLine(to: CGPoint(x: x, y: bottom))
+                case -1:
+                    path.move(to: CGPoint(x: x, y: top))
+                    path.addLine(to: CGPoint(x: x + cellWidth, y: bottom))
+                default:
+                    path.move(to: CGPoint(x: x + cellWidth / 2, y: top))
+                    path.addLine(to: CGPoint(x: x + cellWidth / 2, y: bottom))
+                }
+                context.stroke(path, with: .foreground, style: style)
             }
-            context.stroke(path, with: .foreground, style: style)
             x += cellWidth
         }
         return x
@@ -250,6 +271,18 @@ struct DecimalReadoutView: View {
         if value > 0 { return "+\(value)" }
         if value < 0 { return "\(value)" }
         return " 0"
+    }
+}
+
+// MARK: - iOS Version Compatibility
+
+struct HideHomeIndicatorModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.persistentSystemOverlays(.hidden)
+        } else {
+            content
+        }
     }
 }
 
