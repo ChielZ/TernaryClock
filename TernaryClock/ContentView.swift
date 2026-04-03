@@ -148,18 +148,95 @@ struct SettingsCard: View {
     @Binding var showLeadingZeros: Bool
     @Binding var foregroundColor: Color
     @Binding var backgroundColor: Color
+    @State private var showInfo = false
 
     var body: some View {
         VStack(spacing: 20) {
             Toggle("Leading zeros", isOn: $showLeadingZeros)
             ColorPicker("Foreground", selection: $foregroundColor, supportsOpacity: false)
             ColorPicker("Background", selection: $backgroundColor, supportsOpacity: false)
+
+            Divider()
+
+            Button {
+                showInfo = true
+            } label: {
+                Label("About Ternary Clock", systemImage: "info.circle")
+            }
         }
         .padding(24)
         .contentShape(Rectangle())
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: 500)
         .padding(.horizontal, 32)
+        .sheet(isPresented: $showInfo) {
+            InfoView()
+        }
+    }
+}
+
+// MARK: - Info View
+
+struct InfoView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    section("How to read it",
+                        "The day is divided into 27 hours of 27 minutes of 27 seconds. " +
+                        "One ternary second is roughly 4.4 standard seconds — close to what " +
+                        "psychologists call the \"extended present,\" the duration of time " +
+                        "we experience as now.",
+
+                        "Noon is the center of the day: 0\u{2009}·\u{2009}0\u{2009}·\u{2009}0. " +
+                        "Morning hours are negative, counting up toward zero. " +
+                        "Afternoon hours are positive, counting away from it. " +
+                        "Midnight is not a number — it falls between ticks, in the gap " +
+                        "where +13 wraps to −13 and one day becomes the next.",
+
+                        "Each digit is drawn as a line: / for +1, | for zero, \\ for −1. " +
+                        "Any number and its negative are mirror images of each other."
+                    )
+
+                    section("Why balanced ternary?",
+                        "Binary — the foundation of modern computing — has no center. " +
+                        "Zero sits at the edge, and negative numbers need a special sign. " +
+                        "Balanced ternary puts zero at the center, with positive and negative " +
+                        "values extending symmetrically from it. Negative numbers aren't marked; " +
+                        "they arise naturally from the digits.",
+
+                        "This symmetry connects to open questions in physics about the nature " +
+                        "of time and the relationship between the discrete and the continuous. " +
+                        "Binary encodes a world of sharp boundaries. Balanced ternary encodes " +
+                        "a world with a center. Experiencing time through this lens — where the " +
+                        "day pivots around noon rather than resetting at midnight — offers a " +
+                        "different, and perhaps more natural, sense of its passing."
+                    )
+                }
+                .padding(24)
+            }
+            .navigationTitle("About")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func section(_ title: String, _ paragraphs: String...) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, text in
+                Text(text)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
