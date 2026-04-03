@@ -58,7 +58,23 @@ struct TernaryTime {
 
 struct ContentView: View {
     @State private var showSettings = false
-    @State private var showLeadingZeros = true
+    @AppStorage("showLeadingZeros") private var showLeadingZeros = true
+    @AppStorage("foregroundColorHex") private var foregroundColorHex = "ECD9AF"
+    @AppStorage("backgroundColorHex") private var backgroundColorHex = "000000"
+
+    private var foregroundColor: Binding<Color> {
+        Binding(
+            get: { Color(hex: foregroundColorHex) },
+            set: { foregroundColorHex = $0.toHex() }
+        )
+    }
+
+    private var backgroundColor: Binding<Color> {
+        Binding(
+            get: { Color(hex: backgroundColorHex) },
+            set: { backgroundColorHex = $0.toHex() }
+        )
+    }
 
     var body: some View {
         TimelineView(.periodic(
@@ -68,23 +84,32 @@ struct ContentView: View {
             let time = TernaryTime.from(date: context.date)
 
             ZStack {
-                Color(.systemGroupedBackground)
+                backgroundColor.wrappedValue
                     .ignoresSafeArea()
 
-                MainClockView(time: time, showLeadingZeros: showLeadingZeros)
-                    .onTapGesture {
-                        withAnimation { showSettings = true }
-                    }
+                MainClockView(
+                    time: time,
+                    showLeadingZeros: showLeadingZeros,
+                    foregroundColor: foregroundColor.wrappedValue
+                )
+                .onTapGesture {
+                    withAnimation { showSettings = true }
+                }
 
                 if showSettings {
-                    Color.black.opacity(0.3)
+                    Color.clear
                         .ignoresSafeArea()
-
-                    SettingsCard(showLeadingZeros: $showLeadingZeros)
-                        .transition(.opacity)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             withAnimation { showSettings = false }
                         }
+
+                    SettingsCard(
+                        showLeadingZeros: $showLeadingZeros,
+                        foregroundColor: foregroundColor,
+                        backgroundColor: backgroundColor
+                    )
+                    .transition(.opacity)
                 }
             }
         }
@@ -99,6 +124,7 @@ struct ContentView: View {
 struct MainClockView: View {
     let time: TernaryTime
     let showLeadingZeros: Bool
+    let foregroundColor: Color
 
     private let hPadding: CGFloat = 16
 
@@ -107,7 +133,8 @@ struct MainClockView: View {
             hours: time.hours,
             minutes: time.minutes,
             seconds: time.seconds,
-            showLeadingZeros: showLeadingZeros
+            showLeadingZeros: showLeadingZeros,
+            foregroundColor: foregroundColor
         )
         .aspectRatio(11.0 / 3.0, contentMode: .fit)
         .padding(.horizontal, hPadding)
@@ -119,33 +146,20 @@ struct MainClockView: View {
 
 struct SettingsCard: View {
     @Binding var showLeadingZeros: Bool
+    @Binding var foregroundColor: Color
+    @Binding var backgroundColor: Color
 
     var body: some View {
         VStack(spacing: 20) {
             Toggle("Leading zeros", isOn: $showLeadingZeros)
+            ColorPicker("Foreground", selection: $foregroundColor, supportsOpacity: false)
+            ColorPicker("Background", selection: $backgroundColor, supportsOpacity: false)
         }
         .padding(24)
+        .contentShape(Rectangle())
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .frame(maxWidth: 500)
         .padding(.horizontal, 32)
-    }
-}
-
-// MARK: - Layout
-
-struct ClockLayout {
-    let displayHeight: CGFloat
-
-    /// Always 9 trits + 2 separators = 11 units.
-    private static let totalUnits: CGFloat = 11
-
-    init(availableWidth: CGFloat, hPadding: CGFloat) {
-        let canvasWidth = availableWidth - 2 * hPadding
-        let roughCellWidth = canvasWidth / Self.totalUnits
-        let lineWidth = roughCellWidth * 0.15
-        let edgePad = lineWidth / 2 + 2
-        let cellWidth = (canvasWidth - 2 * edgePad) / Self.totalUnits
-        displayHeight = cellWidth * 3
     }
 }
 
@@ -159,6 +173,7 @@ struct ClockDisplayCanvas: View {
     let minutes: [Int]
     let seconds: [Int]
     let showLeadingZeros: Bool
+    var foregroundColor: Color = .primary
 
     private let totalUnits: CGFloat = 11
 
@@ -174,24 +189,26 @@ struct ClockDisplayCanvas: View {
             let bottom = size.height - vPad
             let dotSize = actualLineWidth * 1.2
             let style = StrokeStyle(lineWidth: actualLineWidth, lineCap: .round)
+            let shading = GraphicsContext.Shading.color(foregroundColor)
 
             var x = edgePad
 
             x = drawTrits(hours, at: x, cellWidth: cellWidth,
-                          top: top, bottom: bottom, style: style, in: context)
+                          top: top, bottom: bottom, style: style, shading: shading, in: context)
             x = drawDot(at: x, width: cellWidth, dotSize: dotSize,
-                        midY: size.height / 2, in: context)
+                        midY: size.height / 2, shading: shading, in: context)
             x = drawTrits(minutes, at: x, cellWidth: cellWidth,
-                          top: top, bottom: bottom, style: style, in: context)
+                          top: top, bottom: bottom, style: style, shading: shading, in: context)
             x = drawDot(at: x, width: cellWidth, dotSize: dotSize,
-                        midY: size.height / 2, in: context)
+                        midY: size.height / 2, shading: shading, in: context)
             _ = drawTrits(seconds, at: x, cellWidth: cellWidth,
-                          top: top, bottom: bottom, style: style, in: context)
+                          top: top, bottom: bottom, style: style, shading: shading, in: context)
         }
     }
 
     private func drawTrits(_ trits: [Int], at startX: CGFloat, cellWidth: CGFloat,
                            top: CGFloat, bottom: CGFloat, style: StrokeStyle,
+                           shading: GraphicsContext.Shading,
                            in context: GraphicsContext) -> CGFloat {
         let firstSignificant = showLeadingZeros
             ? 0
@@ -212,7 +229,7 @@ struct ClockDisplayCanvas: View {
                     path.move(to: CGPoint(x: x + cellWidth / 2, y: top))
                     path.addLine(to: CGPoint(x: x + cellWidth / 2, y: bottom))
                 }
-                context.stroke(path, with: .foreground, style: style)
+                context.stroke(path, with: shading, style: style)
             }
             x += cellWidth
         }
@@ -220,11 +237,12 @@ struct ClockDisplayCanvas: View {
     }
 
     private func drawDot(at startX: CGFloat, width: CGFloat, dotSize: CGFloat,
-                         midY: CGFloat, in context: GraphicsContext) -> CGFloat {
+                         midY: CGFloat, shading: GraphicsContext.Shading,
+                         in context: GraphicsContext) -> CGFloat {
         let cx = startX + width / 2
         let rect = CGRect(x: cx - dotSize / 2, y: midY - dotSize / 2,
                           width: dotSize, height: dotSize)
-        context.fill(Circle().path(in: rect), with: .foreground)
+        context.fill(Circle().path(in: rect), with: shading)
         return startX + width
     }
 }
@@ -250,6 +268,32 @@ struct DecimalReadoutView: View {
         if value > 0 { return "+\(value)" }
         if value < 0 { return "\(value)" }
         return " 0"
+    }
+}
+
+// MARK: - Color Hex Conversion
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        var rgb: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&rgb)
+        self.init(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+
+    func toHex() -> String {
+        let components = UIColor(self).cgColor.components ?? [0, 0, 0]
+        let r = components.count > 0 ? components[0] : 0
+        let g = components.count > 1 ? components[1] : 0
+        let b = components.count > 2 ? components[2] : 0
+        return String(format: "%02X%02X%02X",
+                      Int(round(r * 255)),
+                      Int(round(g * 255)),
+                      Int(round(b * 255)))
     }
 }
 
