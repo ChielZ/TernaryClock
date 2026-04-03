@@ -72,23 +72,19 @@ struct ContentView: View {
                     .ignoresSafeArea()
 
                 MainClockView(time: time, showLeadingZeros: showLeadingZeros)
-                    .onTapGesture(count: 2) {
+                    .onTapGesture {
                         withAnimation { showSettings = true }
                     }
 
                 if showSettings {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
+
+                    SettingsCard(showLeadingZeros: $showLeadingZeros)
+                        .transition(.opacity)
+                        .onTapGesture {
                             withAnimation { showSettings = false }
                         }
-
-                    SettingsCard(
-                        time: time,
-                        showLeadingZeros: $showLeadingZeros
-                    )
-                    .transition(.opacity)
                 }
             }
         }
@@ -99,7 +95,7 @@ struct ContentView: View {
 
 // MARK: - Main Clock View
 
-/// Full-screen view showing only the ternary clock, perfectly centered.
+/// Full-screen view showing only the ternary clock, perfectly centered within the safe area.
 struct MainClockView: View {
     let time: TernaryTime
     let showLeadingZeros: Bool
@@ -107,42 +103,25 @@ struct MainClockView: View {
     private let hPadding: CGFloat = 16
 
     var body: some View {
-        GeometryReader { geo in
-            let layout = ClockLayout(availableWidth: geo.size.width, hPadding: hPadding)
-
-            ClockDisplayCanvas(
-                hours: time.hours,
-                minutes: time.minutes,
-                seconds: time.seconds,
-                showLeadingZeros: showLeadingZeros
-            )
-            .frame(width: geo.size.width - 2 * hPadding, height: layout.displayHeight)
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
-        }
-        .ignoresSafeArea()
+        ClockDisplayCanvas(
+            hours: time.hours,
+            minutes: time.minutes,
+            seconds: time.seconds,
+            showLeadingZeros: showLeadingZeros
+        )
+        .aspectRatio(11.0 / 3.0, contentMode: .fit)
+        .padding(.horizontal, hPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 // MARK: - Settings Card
 
 struct SettingsCard: View {
-    let time: TernaryTime
     @Binding var showLeadingZeros: Bool
 
     var body: some View {
         VStack(spacing: 20) {
-            ClockDisplayCanvas(
-                hours: time.hours,
-                minutes: time.minutes,
-                seconds: time.seconds,
-                showLeadingZeros: showLeadingZeros
-            )
-            .aspectRatio(11.0 / 3.0, contentMode: .fit)
-
-            DecimalReadoutView(time: time)
-
-            Divider()
-
             Toggle("Leading zeros", isOn: $showLeadingZeros)
         }
         .padding(24)
