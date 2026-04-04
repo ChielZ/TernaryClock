@@ -59,7 +59,7 @@ struct TernaryTime {
 struct ContentView: View {
     @State private var showSettings = false
     @AppStorage("showLeadingZeros") private var showLeadingZeros = true
-    @AppStorage("foregroundColorHex") private var foregroundColorHex = "ECD9AF"
+    @AppStorage("foregroundColorHex") private var foregroundColorHex = "D9CBAE"
     @AppStorage("backgroundColorHex") private var backgroundColorHex = "000000"
 
     private var foregroundColor: Binding<Color> {
