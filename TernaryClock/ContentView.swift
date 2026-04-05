@@ -153,6 +153,13 @@ struct ContentView: View {
                     onClose: { withAnimation { showSettings = false } }
                 )
             } else {
+                Color.clear
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation { showSettings = true }
+                    }
+
                 MainClockView(
                     time: time,
                     showLeadingZeros: showLeadingZeros,
@@ -162,9 +169,7 @@ struct ContentView: View {
                     foregroundColor: clockForeground,
                     backgroundColor: clockBackground
                 )
-                .onTapGesture {
-                    withAnimation { showSettings = true }
-                }
+                .allowsHitTesting(false)
             }
         }
     }
@@ -311,6 +316,8 @@ struct SettingsView: View {
                 }
             }
             .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture { onClose() }
 
             Rectangle()
                 .fill(uiFg.opacity(0.15))
@@ -321,8 +328,6 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Spacer()
 
-                Toggle("Analog display", isOn: $useAnalogDisplay)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
                 Toggle("Show leading zeros", isOn: $showLeadingZeros)
                     .toggleStyle(FlatToggleStyle(color: uiFg))
                     .opacity(useAnalogDisplay ? 0 : 1)
@@ -344,6 +349,8 @@ struct SettingsView: View {
                 colorSelector
 
                 Toggle("Invert", isOn: $invertColors)
+                    .toggleStyle(FlatToggleStyle(color: uiFg))
+                Toggle("Analog display", isOn: $useAnalogDisplay)
                     .toggleStyle(FlatToggleStyle(color: uiFg))
 
                 Spacer()
@@ -409,8 +416,8 @@ struct SettingsView: View {
                 infoParagraph(
                     "The display is made out of \u{2018}trits\u{2019}, ternary digits that " +
                     "can each have 3 values: \u{2018}/\u{2019}, \u{2018}|\u{2019} and " +
-                    "\u{2018}\\\u{2019}. The highest value is \u{2018}/\u{2019}, the center " +
-                    "value is \u{2018}|\u{2019} and the lowest value is \u{2018}\\\u{2019}. " +
+                    "\u{2018}\\\u{2019}. The lowest value is \u{2018}\\\u{2019}, the center " +
+                    "value is \u{2018}|\u{2019} and the highest value is \u{2018}/\u{2019}. " +
                     "You can think of these as representing 0, 1, and 2, but there are " +
                     "other (and perhaps more fitting) ways of thinking about them as well, " +
                     "such as \u{2018}\u{2212}1, 0, +1\u{2019}, \u{2018}down, center, " +
@@ -457,6 +464,7 @@ struct SettingsView: View {
     private func infoParagraph(_ text: String) -> some View {
         Text(text)
             .font(.custom("Comfortaa", size: 16))
+            .lineSpacing(16 * 0.1) // 10% extra line spacing
     }
 }
 
