@@ -95,6 +95,7 @@ struct ContentView: View {
     @AppStorage("useBalancedDecimal") private var useBalancedDecimal = false
     @AppStorage("selectedColorIndex") private var selectedColorIndex = ColorPalette.defaultIndex
     @AppStorage("invertColors") private var invertColors = false
+    @AppStorage("useAnalogDisplay") private var useAnalogDisplay = false
 
     private var clockForeground: Color {
         invertColors ? .black : ColorPalette.color(at: selectedColorIndex)
@@ -123,6 +124,7 @@ struct ContentView: View {
                         useBalancedDecimal: $useBalancedDecimal,
                         selectedColorIndex: $selectedColorIndex,
                         invertColors: $invertColors,
+                        useAnalogDisplay: $useAnalogDisplay,
                         clockForeground: clockForeground,
                         clockBackground: clockBackground,
                         onClose: { withAnimation { showSettings = false } }
@@ -133,7 +135,9 @@ struct ContentView: View {
                         showLeadingZeros: showLeadingZeros,
                         showDecimalValues: showDecimalValues,
                         useBalancedDecimal: useBalancedDecimal,
-                        foregroundColor: clockForeground
+                        useAnalogDisplay: useAnalogDisplay,
+                        foregroundColor: clockForeground,
+                        backgroundColor: clockBackground
                     )
                     .onTapGesture {
                         withAnimation { showSettings = true }
@@ -148,39 +152,56 @@ struct ContentView: View {
 
 // MARK: - Main Clock View
 
-/// Full-screen view showing only the ternary clock, perfectly centered within the safe area.
 struct MainClockView: View {
     let time: TernaryTime
     let showLeadingZeros: Bool
     let showDecimalValues: Bool
     let useBalancedDecimal: Bool
+    let useAnalogDisplay: Bool
     let foregroundColor: Color
+    let backgroundColor: Color
 
     private let hPadding: CGFloat = 16
 
     var body: some View {
-        GeometryReader { geo in
-            let clockWidth = geo.size.width - 2 * hPadding
-            let cellWidth = clockWidth / 11
-            let decimalFontSize = max(16, cellWidth * 0.7)
-
-            VStack(spacing: cellWidth * 0.6) {
-                ClockDisplayCanvas(
-                    hours: time.hours,
-                    minutes: time.minutes,
-                    seconds: time.seconds,
-                    showLeadingZeros: showLeadingZeros,
-                    foregroundColor: foregroundColor
+        if useAnalogDisplay {
+            GeometryReader { geo in
+                let safeW = geo.size.width - geo.safeAreaInsets.leading - geo.safeAreaInsets.trailing
+                let safeH = geo.size.height - geo.safeAreaInsets.top - geo.safeAreaInsets.bottom
+                let side = min(safeW, safeH) - 2 * hPadding
+                AnalogClockView(
+                    time: time,
+                    faceColor: foregroundColor,
+                    detailColor: backgroundColor
                 )
-                .aspectRatio(11.0 / 3.0, contentMode: .fit)
-                .padding(.horizontal, hPadding)
-
-                if showDecimalValues {
-                    DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal, fontSize: decimalFontSize)
-                        .foregroundStyle(foregroundColor)
-                }
+                .frame(width: side, height: side)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea()
+        } else {
+            GeometryReader { geo in
+                let clockWidth = geo.size.width - 2 * hPadding
+                let cellWidth = clockWidth / 11
+                let decimalFontSize = max(16, cellWidth * 0.7)
+
+                VStack(spacing: cellWidth * 0.6) {
+                    ClockDisplayCanvas(
+                        hours: time.hours,
+                        minutes: time.minutes,
+                        seconds: time.seconds,
+                        showLeadingZeros: showLeadingZeros,
+                        foregroundColor: foregroundColor
+                    )
+                    .aspectRatio(11.0 / 3.0, contentMode: .fit)
+                    .padding(.horizontal, hPadding)
+
+                    if showDecimalValues {
+                        DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal, fontSize: decimalFontSize)
+                            .foregroundStyle(foregroundColor)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
     }
 }
@@ -194,6 +215,7 @@ struct SettingsView: View {
     @Binding var useBalancedDecimal: Bool
     @Binding var selectedColorIndex: Int
     @Binding var invertColors: Bool
+    @Binding var useAnalogDisplay: Bool
     let clockForeground: Color
     let clockBackground: Color
     let onClose: () -> Void
@@ -238,53 +260,66 @@ struct SettingsView: View {
 
     private var leftPanel: some View {
         VStack(spacing: 0) {
-            // Top-left quarter: clock preview with clock colors
-            VStack(spacing: 12) {
-                Spacer()
+            // Top-left quarter: clock preview
+            ZStack {
+                clockBackground
 
-                ClockDisplayCanvas(
-                    hours: time.hours,
-                    minutes: time.minutes,
-                    seconds: time.seconds,
-                    showLeadingZeros: showLeadingZeros,
-                    foregroundColor: clockForeground
-                )
-                .aspectRatio(11.0 / 3.0, contentMode: .fit)
-                .padding(.horizontal, 16)
+                VStack(spacing: 12) {
+                    if useAnalogDisplay {
+                        AnalogClockView(
+                            time: time,
+                            faceColor: clockForeground,
+                            detailColor: clockBackground
+                        )
+                        .padding(24)
+                    } else {
+                        ClockDisplayCanvas(
+                            hours: time.hours,
+                            minutes: time.minutes,
+                            seconds: time.seconds,
+                            showLeadingZeros: showLeadingZeros,
+                            foregroundColor: clockForeground
+                        )
+                        .aspectRatio(11.0 / 3.0, contentMode: .fit)
+                        .padding(.horizontal, 16)
+                    }
 
-                if showDecimalValues {
-                    DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
-                        .foregroundStyle(clockForeground)
+                    if showDecimalValues && !useAnalogDisplay {
+                        DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
+                            .foregroundStyle(clockForeground)
+                    }
                 }
-
-                Spacer()
             }
             .frame(maxHeight: .infinity)
-            .background(clockBackground)
 
             Rectangle()
                 .fill(uiFg.opacity(0.15))
                 .frame(height: 1)
                 .padding(.horizontal, 16)
 
-            // Bottom-left quarter: controls + close button
+            // Bottom-left quarter: controls
             VStack(alignment: .leading, spacing: 16) {
                 Spacer()
 
+                Toggle("Analog display", isOn: $useAnalogDisplay)
+                    .toggleStyle(FlatToggleStyle(color: uiFg))
                 Toggle("Show leading zeros", isOn: $showLeadingZeros)
                     .toggleStyle(FlatToggleStyle(color: uiFg))
+                    .opacity(useAnalogDisplay ? 0 : 1)
+                    .allowsHitTesting(!useAnalogDisplay)
                 Toggle("Show decimal values", isOn: $showDecimalValues)
                     .toggleStyle(FlatToggleStyle(color: uiFg))
+                    .opacity(useAnalogDisplay ? 0 : 1)
+                    .allowsHitTesting(!useAnalogDisplay)
 
                 Picker("Notation", selection: $useBalancedDecimal) {
                     Text("Unbalanced").tag(false)
                     Text("Balanced").tag(true)
                 }
                 .pickerStyle(.segmented)
-                .opacity(showDecimalValues ? 1 : 0)
-                .allowsHitTesting(showDecimalValues)
+                .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
+                .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
 
-                // Color selector
                 Text("Color")
                 colorSelector
 
@@ -313,15 +348,15 @@ struct SettingsView: View {
                 Circle()
                     .fill(ColorPalette.color(at: i))
                     .frame(
-                        width: i == selectedColorIndex ? 22 : 14,
-                        height: i == selectedColorIndex ? 22 : 14
+                        width: i == selectedColorIndex ? 20 : 12,
+                        height: i == selectedColorIndex ? 20 : 12
                     )
                     .overlay(
                         Circle()
                             .stroke(uiFg.opacity(i == selectedColorIndex ? 0.8 : 0), lineWidth: 1.5)
                     )
-                    .frame(maxWidth: .infinity) // distribute evenly across full width
-                    .contentShape(Rectangle()) // tap target fills the full cell
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             selectedColorIndex = i
@@ -405,11 +440,169 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Clock Display Canvas
+// MARK: - Analog Clock View
 
-/// Draws the entire clock (all trit groups and dot separators) in a single Canvas.
-/// Layout is always 9 trits + 2 separators; when showLeadingZeros is false,
-/// leading zero trits are simply not drawn.
+struct AnalogClockView: View {
+    let time: TernaryTime
+    let faceColor: Color      // circle fill
+    let detailColor: Color    // markers and hands
+
+    // Hand lengths as fraction of radius
+    var hourHandLength: CGFloat = 0.45
+    var minuteHandLength: CGFloat = 0.60
+    var secondHandLength: CGFloat = 0.75
+
+    // Hand widths as fraction of radius
+    var hourHandWidth: CGFloat = 0.033
+    var minuteHandWidth: CGFloat = 0.033
+    var secondHandWidth: CGFloat = 0.033
+
+    var handOpacity: CGFloat = 0.5
+
+    // Marker line data from SVG — each marker's lines as (x1,y1,x2,y2) in local coords, height=1200
+    private static let markers: [(value: Int, width: CGFloat, lines: [(CGFloat, CGFloat, CGFloat, CGFloat)])] = [
+        (12,  600, [(600,0, 600,1200), (600,0, 200,1200), (400,0, 0,1200)]),
+        ( 9,  600, [(600,0, 600,1200), (400,0, 400,1200), (400,0, 0,1200)]),
+        ( 6,  800, [(800,0, 800,1200), (400,0, 800,1200), (400,0, 0,1200)]),
+        ( 3,  400, [(400,0, 400,1200), (400,0, 0,1200)]),
+        ( 0,    0, [(0,0, 0,1200)]),
+        (-3,  400, [(400,0, 400,1200), (0,0, 400,1200)]),
+        (-6,  800, [(800,0, 800,1200), (800,0, 400,1200), (0,0, 400,1200)]),
+        (-9,  600, [(600,0, 600,1200), (400,0, 400,1200), (0,0, 400,1200)]),
+        (-12, 600, [(600,0, 600,1200), (200,0, 600,1200), (0,0, 400,1200)]),
+    ]
+
+    var body: some View {
+        Canvas { context, size in
+            let diameter = min(size.width, size.height)
+            let radius = diameter / 2
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+
+            // Circle face
+            let circleRect = CGRect(x: center.x - radius, y: center.y - radius,
+                                     width: diameter, height: diameter)
+            context.fill(Circle().path(in: circleRect), with: .color(faceColor))
+
+            // Markers
+            let markerHeight = radius * 0.14
+            let markerOuterR = radius * 0.90
+            let markerLineWidth = markerHeight * 0.045
+            let markerStyle = StrokeStyle(lineWidth: markerLineWidth, lineCap: .round)
+            let markerShading = GraphicsContext.Shading.color(detailColor)
+
+            for marker in Self.markers {
+                let angle = CGFloat(marker.value) / 27.0 * 360.0
+                drawMarker(marker.lines, markerWidth: marker.width, angle: angle,
+                           center: center, outerR: markerOuterR, height: markerHeight,
+                           style: markerStyle, shading: markerShading, in: context)
+            }
+
+            // Hands
+            let handShading = GraphicsContext.Shading.color(detailColor.opacity(handOpacity))
+
+            let hourAngle = (CGFloat(time.hoursDecimal)
+                + CGFloat(time.minutesDecimal) / 27.0
+                + CGFloat(time.secondsDecimal) / 729.0) / 27.0 * 360.0
+            let minuteAngle = (CGFloat(time.minutesDecimal)
+                + CGFloat(time.secondsDecimal) / 27.0) / 27.0 * 360.0
+            let secondAngle = CGFloat(time.secondsDecimal) / 27.0 * 360.0
+
+            drawHand(.hour, angle: hourAngle, length: hourHandLength * radius,
+                     width: hourHandWidth * radius, center: center, shading: handShading, in: context)
+            drawHand(.minute, angle: minuteAngle, length: minuteHandLength * radius,
+                     width: minuteHandWidth * radius, center: center, shading: handShading, in: context)
+            drawHand(.second, angle: secondAngle, length: secondHandLength * radius,
+                     width: secondHandWidth * radius, center: center, shading: handShading, in: context)
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    // MARK: Marker drawing
+
+    private func drawMarker(_ lines: [(CGFloat, CGFloat, CGFloat, CGFloat)],
+                             markerWidth: CGFloat, angle: CGFloat,
+                             center: CGPoint, outerR: CGFloat, height: CGFloat,
+                             style: StrokeStyle, shading: GraphicsContext.Shading,
+                             in context: GraphicsContext) {
+        let scale = height / 1200.0
+        let θ = angle * .pi / 180.0
+
+        // Position marker center on the circle, but keep it upright (no rotation)
+        let mx = center.x + outerR * sin(θ)
+        let my = center.y - outerR * cos(θ)
+
+        for (x1, y1, x2, y2) in lines {
+            let px1 = (x1 - markerWidth / 2) * scale
+            let py1 = (y1 - 600) * scale  // center vertically (600 = half of 1200)
+            let px2 = (x2 - markerWidth / 2) * scale
+            let py2 = (y2 - 600) * scale
+
+            let p1 = CGPoint(x: mx + px1, y: my + py1)
+            let p2 = CGPoint(x: mx + px2, y: my + py2)
+
+            var path = Path()
+            path.move(to: p1)
+            path.addLine(to: p2)
+            context.stroke(path, with: shading, style: style)
+        }
+    }
+
+    // MARK: Hand drawing
+
+    private enum HandType { case hour, minute, second }
+
+    private func drawHand(_ type: HandType, angle: CGFloat, length: CGFloat,
+                           width: CGFloat, center: CGPoint,
+                           shading: GraphicsContext.Shading,
+                           in context: GraphicsContext) {
+        let path = handPath(type, length: length, width: width)
+        let θ = angle * .pi / 180.0
+        let transform = CGAffineTransform(rotationAngle: θ)
+            .concatenating(CGAffineTransform(translationX: center.x, y: center.y))
+        context.fill(path.applying(transform), with: shading)
+    }
+
+    private func handPath(_ type: HandType, length: CGFloat, width: CGFloat) -> Path {
+        let hw = width / 2
+        var path = Path()
+
+        // Start at right of center semicircle
+        path.move(to: CGPoint(x: hw, y: 0))
+
+        // Semicircle at center (rounded end extending below origin)
+        path.addArc(center: .zero, radius: hw,
+                     startAngle: .degrees(0), endAngle: .degrees(180),
+                     clockwise: false)
+        // Now at (-hw, 0)
+
+        // Left edge up + outer termination
+        switch type {
+        case .second: // triangle tip
+            path.addLine(to: CGPoint(x: -hw, y: -(length - width)))
+            path.addLine(to: CGPoint(x: 0, y: -length))
+            path.addLine(to: CGPoint(x: hw, y: -(length - width)))
+
+        case .minute: // square tip
+            path.addLine(to: CGPoint(x: -hw, y: -length))
+            path.addLine(to: CGPoint(x: hw, y: -length))
+
+        case .hour: // semicircle tip (rounded end extending outward)
+            path.addLine(to: CGPoint(x: -hw, y: -(length - hw)))
+            path.addArc(center: CGPoint(x: 0, y: -(length - hw)), radius: hw,
+                         startAngle: .degrees(180), endAngle: .degrees(0),
+                         clockwise: false)
+        }
+
+        // Right edge back down
+        path.addLine(to: CGPoint(x: hw, y: 0))
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Digital Clock Display Canvas
+
+/// Draws the entire digital clock (all trit groups and dot separators) in a single Canvas.
 struct ClockDisplayCanvas: View {
     let hours: [Int]
     let minutes: [Int]
@@ -521,8 +714,6 @@ struct DecimalReadoutView: View {
 
 // MARK: - Flat Toggle Style
 
-/// A minimal 2D toggle: foreground-colored thumb sliding on a neutral track.
-/// No 3D effects, no track color change between states.
 struct FlatToggleStyle: ToggleStyle {
     let color: Color
 
