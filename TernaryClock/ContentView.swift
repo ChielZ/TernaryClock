@@ -5,6 +5,8 @@ import SwiftUI
 struct TernaryTime {
     /// 9 trits representing HHH:MMM:SSS, each -1, 0, or 1
     let trits: [Int]
+    /// Continuous ternary seconds since noon (for smooth analog hand movement)
+    let continuousTotal: Double
 
     var hours: [Int] { Array(trits[0..<3]) }
     var minutes: [Int] { Array(trits[3..<6]) }
@@ -25,9 +27,10 @@ struct TernaryTime {
         let startOfDay = Calendar.current.startOfDay(for: date)
         let realSecs = date.timeIntervalSince(startOfDay)
         let sinceNoon = realSecs - 43200.0
-        var total = Int(floor(sinceNoon / ternarySecondDuration))
+        let continuous = sinceNoon / ternarySecondDuration
+        var total = Int(floor(continuous))
         total = max(-9841, min(9841, total))
-        return TernaryTime(trits: toBalancedTernary(total, digits: 9))
+        return TernaryTime(trits: toBalancedTernary(total, digits: 9), continuousTotal: continuous)
     }
 
     /// Noon today — always ternary second 0, used to anchor the periodic schedule.
@@ -106,47 +109,61 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(
-            from: TernaryTime.noonToday(),
-            by: TernaryTime.ternarySecondDuration
-        )) { context in
-            let time = TernaryTime.from(date: context.date)
+        timelineContent
+            .statusBarHidden(true)
+            .modifier(HideHomeIndicatorModifier())
+    }
 
-            ZStack {
-                (showSettings ? SettingsColors.background : clockBackground)
-                    .ignoresSafeArea()
+    @ViewBuilder
+    private var timelineContent: some View {
+        if useAnalogDisplay {
+            TimelineView(.animation) { context in
+                clockBody(time: TernaryTime.from(date: context.date))
+            }
+        } else {
+            TimelineView(.periodic(
+                from: TernaryTime.noonToday(),
+                by: TernaryTime.ternarySecondDuration
+            )) { context in
+                clockBody(time: TernaryTime.from(date: context.date))
+            }
+        }
+    }
 
-                if showSettings {
-                    SettingsView(
-                        time: time,
-                        showLeadingZeros: $showLeadingZeros,
-                        showDecimalValues: $showDecimalValues,
-                        useBalancedDecimal: $useBalancedDecimal,
-                        selectedColorIndex: $selectedColorIndex,
-                        invertColors: $invertColors,
-                        useAnalogDisplay: $useAnalogDisplay,
-                        clockForeground: clockForeground,
-                        clockBackground: clockBackground,
-                        onClose: { withAnimation { showSettings = false } }
-                    )
-                } else {
-                    MainClockView(
-                        time: time,
-                        showLeadingZeros: showLeadingZeros,
-                        showDecimalValues: showDecimalValues,
-                        useBalancedDecimal: useBalancedDecimal,
-                        useAnalogDisplay: useAnalogDisplay,
-                        foregroundColor: clockForeground,
-                        backgroundColor: clockBackground
-                    )
-                    .onTapGesture {
-                        withAnimation { showSettings = true }
-                    }
+    @ViewBuilder
+    private func clockBody(time: TernaryTime) -> some View {
+        ZStack {
+            (showSettings ? SettingsColors.background : clockBackground)
+                .ignoresSafeArea()
+
+            if showSettings {
+                SettingsView(
+                    time: time,
+                    showLeadingZeros: $showLeadingZeros,
+                    showDecimalValues: $showDecimalValues,
+                    useBalancedDecimal: $useBalancedDecimal,
+                    selectedColorIndex: $selectedColorIndex,
+                    invertColors: $invertColors,
+                    useAnalogDisplay: $useAnalogDisplay,
+                    clockForeground: clockForeground,
+                    clockBackground: clockBackground,
+                    onClose: { withAnimation { showSettings = false } }
+                )
+            } else {
+                MainClockView(
+                    time: time,
+                    showLeadingZeros: showLeadingZeros,
+                    showDecimalValues: showDecimalValues,
+                    useBalancedDecimal: useBalancedDecimal,
+                    useAnalogDisplay: useAnalogDisplay,
+                    foregroundColor: clockForeground,
+                    backgroundColor: clockBackground
+                )
+                .onTapGesture {
+                    withAnimation { showSettings = true }
                 }
             }
         }
-        .statusBarHidden(true)
-        .modifier(HideHomeIndicatorModifier())
     }
 }
 
@@ -168,7 +185,7 @@ struct MainClockView: View {
             GeometryReader { geo in
                 let safeW = geo.size.width - geo.safeAreaInsets.leading - geo.safeAreaInsets.trailing
                 let safeH = geo.size.height - geo.safeAreaInsets.top - geo.safeAreaInsets.bottom
-                let side = min(safeW, safeH) - 2 * hPadding
+                let side = (min(safeW, safeH) - 2 * hPadding) * 0.95
                 AnalogClockView(
                     time: time,
                     faceColor: foregroundColor,
@@ -448,16 +465,16 @@ struct AnalogClockView: View {
     let detailColor: Color    // markers and hands
 
     // Hand lengths as fraction of radius
-    var hourHandLength: CGFloat = 0.45
-    var minuteHandLength: CGFloat = 0.60
-    var secondHandLength: CGFloat = 0.75
+    var hourHandLength: CGFloat = 0.35
+    var minuteHandLength: CGFloat = 0.52
+    var secondHandLength: CGFloat = 0.69
 
     // Hand widths as fraction of radius
-    var hourHandWidth: CGFloat = 0.033
-    var minuteHandWidth: CGFloat = 0.033
-    var secondHandWidth: CGFloat = 0.033
+    var hourHandWidth: CGFloat = 0.025
+    var minuteHandWidth: CGFloat = 0.025
+    var secondHandWidth: CGFloat = 0.025
 
-    var handOpacity: CGFloat = 0.5
+    var handOpacity: CGFloat = 0.7
 
     // Marker line data from SVG — each marker's lines as (x1,y1,x2,y2) in local coords, height=1200
     private static let markers: [(value: Int, width: CGFloat, lines: [(CGFloat, CGFloat, CGFloat, CGFloat)])] = [
@@ -484,8 +501,8 @@ struct AnalogClockView: View {
             context.fill(Circle().path(in: circleRect), with: .color(faceColor))
 
             // Markers
-            let markerHeight = radius * 0.14
-            let markerOuterR = radius * 0.90
+            let markerHeight = radius * 0.21
+            let markerOuterR = radius * 0.85
             let markerLineWidth = markerHeight * 0.045
             let markerStyle = StrokeStyle(lineWidth: markerLineWidth, lineCap: .round)
             let markerShading = GraphicsContext.Shading.color(detailColor)
@@ -500,12 +517,11 @@ struct AnalogClockView: View {
             // Hands
             let handShading = GraphicsContext.Shading.color(detailColor.opacity(handOpacity))
 
-            let hourAngle = (CGFloat(time.hoursDecimal)
-                + CGFloat(time.minutesDecimal) / 27.0
-                + CGFloat(time.secondsDecimal) / 729.0) / 27.0 * 360.0
-            let minuteAngle = (CGFloat(time.minutesDecimal)
-                + CGFloat(time.secondsDecimal) / 27.0) / 27.0 * 360.0
-            let secondAngle = CGFloat(time.secondsDecimal) / 27.0 * 360.0
+            // Continuous angles from fractional ternary time
+            let ct = CGFloat(time.continuousTotal)
+            let hourAngle = ct / 19683.0 * 360.0    // one rotation per day
+            let minuteAngle = ct / 729.0 * 360.0    // one rotation per ternary hour
+            let secondAngle = ct / 27.0 * 360.0     // one rotation per ternary minute
 
             drawHand(.hour, angle: hourAngle, length: hourHandLength * radius,
                      width: hourHandWidth * radius, center: center, shading: handShading, in: context)
