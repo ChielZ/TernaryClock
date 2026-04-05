@@ -117,7 +117,10 @@ struct ContentView: View {
     @ViewBuilder
     private var timelineContent: some View {
         if useAnalogDisplay {
-            TimelineView(.animation) { context in
+            TimelineView(.periodic(
+                from: TernaryTime.noonToday(),
+                by: TernaryTime.ternarySecondDuration / 27.0 // divide by 27 for sub-second ticks (~0.163s)
+            )) { context in
                 clockBody(time: TernaryTime.from(date: context.date))
             }
         } else {
@@ -502,8 +505,8 @@ struct AnalogClockView: View {
 
             // Markers
             let markerHeight = radius * 0.21
-            let markerOuterR = radius * 0.85
-            let markerLineWidth = markerHeight * 0.045
+            let markerOuterR = radius * 0.825
+            let markerLineWidth = markerHeight * 0.05
             let markerStyle = StrokeStyle(lineWidth: markerLineWidth, lineCap: .round)
             let markerShading = GraphicsContext.Shading.color(detailColor)
 
@@ -517,8 +520,8 @@ struct AnalogClockView: View {
             // Hands
             let handShading = GraphicsContext.Shading.color(detailColor.opacity(handOpacity))
 
-            // Continuous angles from fractional ternary time
-            let ct = CGFloat(time.continuousTotal)
+            // Quantize to sub-second ticks (1/27th of a ternary second)
+            let ct = CGFloat(floor(time.continuousTotal * 27.0) / 27.0)
             let hourAngle = ct / 19683.0 * 360.0    // one rotation per day
             let minuteAngle = ct / 729.0 * 360.0    // one rotation per ternary hour
             let secondAngle = ct / 27.0 * 360.0     // one rotation per ternary minute
