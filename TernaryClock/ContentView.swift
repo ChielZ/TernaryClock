@@ -247,17 +247,33 @@ struct SettingsView: View {
 
     private let uiFg = SettingsColors.foreground
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
     var body: some View {
-        HStack(spacing: 0) {
-            leftPanel
-                .frame(maxWidth: .infinity)
+        Group {
+            if sizeClass == .regular {
+                // iPad: side-by-side
+                HStack(spacing: 0) {
+                    leftPanel
+                        .frame(maxWidth: .infinity)
 
-            Rectangle()
-                .fill(uiFg.opacity(0.15))
-                .frame(width: 1)
+                    Rectangle()
+                        .fill(uiFg.opacity(0.15))
+                        .frame(width: 1)
 
-            rightPanel
-                .frame(maxWidth: .infinity)
+                    rightPanel
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                // iPhone: stacked, scrollable
+                ScrollView {
+                    VStack(spacing: 0) {
+                        clockPreview
+                        controls
+                        rightPanel
+                    }
+                }
+            }
         }
         .font(.custom("Comfortaa", size: 16))
         .foregroundStyle(uiFg)
@@ -281,90 +297,98 @@ struct SettingsView: View {
         seg.backgroundColor = fg.withAlphaComponent(0.08)
     }
 
-    // MARK: Left panel
+    // MARK: Left panel (iPad)
 
     private var leftPanel: some View {
         VStack(spacing: 0) {
-            // Top-left quarter: clock preview
-            ZStack {
-                clockBackground
-
-                VStack(spacing: 12) {
-                    if useAnalogDisplay {
-                        AnalogClockView(
-                            time: time,
-                            faceColor: clockForeground,
-                            detailColor: clockBackground
-                        )
-                        .padding(24)
-                    } else {
-                        ClockDisplayCanvas(
-                            hours: time.hours,
-                            minutes: time.minutes,
-                            seconds: time.seconds,
-                            showLeadingZeros: showLeadingZeros,
-                            foregroundColor: clockForeground
-                        )
-                        .aspectRatio(11.0 / 3.0, contentMode: .fit)
-                        .padding(.horizontal, 16)
-                    }
-
-                    if showDecimalValues && !useAnalogDisplay {
-                        DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
-                            .foregroundStyle(clockForeground)
-                    }
-                }
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onTapGesture { onClose() }
+            clockPreview
+                .frame(maxHeight: .infinity)
 
             Rectangle()
                 .fill(uiFg.opacity(0.15))
                 .frame(height: 1)
                 .padding(.horizontal, 16)
 
-            // Bottom-left quarter: controls
-            VStack(alignment: .leading, spacing: 16) {
-                Spacer()
-
-                Toggle("Show leading zeros", isOn: $showLeadingZeros)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-                    .opacity(useAnalogDisplay ? 0 : 1)
-                    .allowsHitTesting(!useAnalogDisplay)
-                Toggle("Show decimal values", isOn: $showDecimalValues)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-                    .opacity(useAnalogDisplay ? 0 : 1)
-                    .allowsHitTesting(!useAnalogDisplay)
-
-                Picker("Notation", selection: $useBalancedDecimal) {
-                    Text("Unbalanced").tag(false)
-                    Text("Balanced").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
-                .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
-
-                Text("Color")
-                colorSelector
-
-                Toggle("Invert", isOn: $invertColors)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-                Toggle("Analog display", isOn: $useAnalogDisplay)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-
-                Spacer()
-
-                Button(action: onClose) {
-                    Text("Close settings")
-                        .font(.custom("Comfortaa", size: 16))
-                        .foregroundStyle(uiFg.opacity(1))
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            .padding(24)
-            .frame(maxHeight: .infinity)
+            controls
+                .frame(maxHeight: .infinity)
         }
+    }
+
+    // MARK: Clock preview
+
+    private var clockPreview: some View {
+        ZStack {
+            clockBackground
+
+            VStack(spacing: 12) {
+                if useAnalogDisplay {
+                    AnalogClockView(
+                        time: time,
+                        faceColor: clockForeground,
+                        detailColor: clockBackground
+                    )
+                    .padding(24)
+                } else {
+                    ClockDisplayCanvas(
+                        hours: time.hours,
+                        minutes: time.minutes,
+                        seconds: time.seconds,
+                        showLeadingZeros: showLeadingZeros,
+                        foregroundColor: clockForeground
+                    )
+                    .aspectRatio(11.0 / 3.0, contentMode: .fit)
+                    .padding(.horizontal, 16)
+                }
+
+                if showDecimalValues && !useAnalogDisplay {
+                    DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
+                        .foregroundStyle(clockForeground)
+                }
+            }
+            .padding(.vertical, 16)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { onClose() }
+    }
+
+    // MARK: Controls
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Toggle("Show leading zeros", isOn: $showLeadingZeros)
+                .toggleStyle(FlatToggleStyle(color: uiFg))
+                .opacity(useAnalogDisplay ? 0 : 1)
+                .allowsHitTesting(!useAnalogDisplay)
+            Toggle("Show decimal values", isOn: $showDecimalValues)
+                .toggleStyle(FlatToggleStyle(color: uiFg))
+                .opacity(useAnalogDisplay ? 0 : 1)
+                .allowsHitTesting(!useAnalogDisplay)
+
+            Picker("Notation", selection: $useBalancedDecimal) {
+                Text("Unbalanced").tag(false)
+                Text("Balanced").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
+            .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
+
+            Text("Color")
+            colorSelector
+
+            Toggle("Invert", isOn: $invertColors)
+                .toggleStyle(FlatToggleStyle(color: uiFg))
+            Toggle("Analog display", isOn: $useAnalogDisplay)
+                .toggleStyle(FlatToggleStyle(color: uiFg))
+
+            Button(action: onClose) {
+                Text("Close settings")
+                    .font(.custom("Comfortaa", size: 16))
+                    .foregroundStyle(uiFg.opacity(1))
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.top, 8)
+        }
+        .padding(24)
     }
 
     // MARK: Color selector
