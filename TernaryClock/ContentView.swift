@@ -72,7 +72,7 @@ struct ColorPalette {
         ("Amber Glow", "F8A036"),
     ]
 
-    static let defaultIndex = 3 // White Sand
+    static let defaultIndex = 4 // White Sand
 
     static func color(at index: Int) -> Color {
         Color(hex: entries[index].hex)
@@ -85,7 +85,7 @@ struct ColorPalette {
 
 /// Fixed colors for the settings UI — always White Sand on black.
 enum SettingsColors {
-    static let foreground = Color(hex: "ECD9AF")
+    static let foreground = Color(hex: "E5A065")
     static let background = Color.black
 }
 
@@ -205,7 +205,8 @@ struct MainClockView: View {
             .ignoresSafeArea()
         } else {
             GeometryReader { geo in
-                let clockWidth = geo.size.width - 2 * hPadding
+                let safeW = geo.size.width - geo.safeAreaInsets.leading - geo.safeAreaInsets.trailing
+                let clockWidth = safeW - 2 * hPadding * 2.5
                 let cellWidth = clockWidth / 11
                 let decimalFontSize = max(16, cellWidth * 0.7)
 
@@ -218,15 +219,16 @@ struct MainClockView: View {
                         foregroundColor: foregroundColor
                     )
                     .aspectRatio(11.0 / 3.0, contentMode: .fit)
-                    .padding(.horizontal, hPadding)
+                    .frame(width: safeW - 2 * hPadding * 2.5)
 
                     if showDecimalValues {
                         DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal, fontSize: decimalFontSize)
                             .foregroundStyle(foregroundColor)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
             }
+            .ignoresSafeArea()
         }
     }
 }
@@ -269,7 +271,9 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         clockPreview
-                        controls
+                            .frame(height: useAnalogDisplay ? 250 : nil)
+                            .background(clockBackground)
+                        controlsContent(compact: true)
                         rightPanel
                     }
                 }
@@ -302,14 +306,15 @@ struct SettingsView: View {
     private var leftPanel: some View {
         VStack(spacing: 0) {
             clockPreview
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(clockBackground)
 
             Rectangle()
                 .fill(uiFg.opacity(0.15))
                 .frame(height: 1)
                 .padding(.horizontal, 16)
 
-            controls
+            controlsContent(compact: false)
                 .frame(maxHeight: .infinity)
         }
     }
@@ -317,60 +322,76 @@ struct SettingsView: View {
     // MARK: Clock preview
 
     private var clockPreview: some View {
-        ZStack {
-            clockBackground
-
-            VStack(spacing: 12) {
-                if useAnalogDisplay {
-                    AnalogClockView(
-                        time: time,
-                        faceColor: clockForeground,
-                        detailColor: clockBackground
-                    )
-                    .padding(24)
-                } else {
-                    ClockDisplayCanvas(
-                        hours: time.hours,
-                        minutes: time.minutes,
-                        seconds: time.seconds,
-                        showLeadingZeros: showLeadingZeros,
-                        foregroundColor: clockForeground
-                    )
-                    .aspectRatio(11.0 / 3.0, contentMode: .fit)
-                    .padding(.horizontal, 16)
-                }
-
-                if showDecimalValues && !useAnalogDisplay {
-                    DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
-                        .foregroundStyle(clockForeground)
-                }
+        VStack(spacing: 12) {
+            if useAnalogDisplay {
+                AnalogClockView(
+                    time: time,
+                    faceColor: clockForeground,
+                    detailColor: clockBackground
+                )
+                .padding(24)
+            } else {
+                ClockDisplayCanvas(
+                    hours: time.hours,
+                    minutes: time.minutes,
+                    seconds: time.seconds,
+                    showLeadingZeros: showLeadingZeros,
+                    foregroundColor: clockForeground
+                )
+                .aspectRatio(11.0 / 3.0, contentMode: .fit)
+                .padding(.horizontal, 16)
             }
-            .padding(.vertical, 16)
+
+            if showDecimalValues && !useAnalogDisplay {
+                DecimalReadoutView(time: time, useBalancedDecimal: useBalancedDecimal)
+                    .foregroundStyle(clockForeground)
+            }
         }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { onClose() }
     }
 
     // MARK: Controls
 
-    private var controls: some View {
+    private func controlsContent(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Toggle("Show leading zeros", isOn: $showLeadingZeros)
-                .toggleStyle(FlatToggleStyle(color: uiFg))
-                .opacity(useAnalogDisplay ? 0 : 1)
-                .allowsHitTesting(!useAnalogDisplay)
-            Toggle("Show decimal values", isOn: $showDecimalValues)
-                .toggleStyle(FlatToggleStyle(color: uiFg))
-                .opacity(useAnalogDisplay ? 0 : 1)
-                .allowsHitTesting(!useAnalogDisplay)
+            if compact {
+                // iPhone: hide/show controls to avoid blank space
+                if !useAnalogDisplay {
+                    Toggle("Show leading zeros", isOn: $showLeadingZeros)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
+                    Toggle("Show decimal values", isOn: $showDecimalValues)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
 
-            Picker("Notation", selection: $useBalancedDecimal) {
-                Text("Unbalanced").tag(false)
-                Text("Balanced").tag(true)
+                    if showDecimalValues {
+                        Picker("Notation", selection: $useBalancedDecimal) {
+                            Text("Unbalanced").tag(false)
+                            Text("Balanced").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+            } else {
+                // iPad: use opacity to reserve space
+                Toggle("Show leading zeros", isOn: $showLeadingZeros)
+                    .toggleStyle(FlatToggleStyle(color: uiFg))
+                    .opacity(useAnalogDisplay ? 0 : 1)
+                    .allowsHitTesting(!useAnalogDisplay)
+                Toggle("Show decimal values", isOn: $showDecimalValues)
+                    .toggleStyle(FlatToggleStyle(color: uiFg))
+                    .opacity(useAnalogDisplay ? 0 : 1)
+                    .allowsHitTesting(!useAnalogDisplay)
+
+                Picker("Notation", selection: $useBalancedDecimal) {
+                    Text("Unbalanced").tag(false)
+                    Text("Balanced").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
+                .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
             }
-            .pickerStyle(.segmented)
-            .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
-            .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
 
             Text("Color")
             colorSelector
@@ -428,7 +449,7 @@ struct SettingsView: View {
 
                 infoParagraph(
                     "This is a balanced ternary clock. It divides the day into 27 hours. " +
-                    "Each of those is divided into 27 minutes, which are in turn divided " +
+                    "Each of the hours is divided into 27 minutes, which are in turn divided " +
                     "into 27 seconds. This means that the ternary hour is a bit shorter " +
                     "than a standard hour, while the ternary minute is about twice as long " +
                     "as a standard minute. The ternary second lasts for about 4.4 standard " +
@@ -439,8 +460,7 @@ struct SettingsView: View {
 
                 infoParagraph(
                     "The display is made out of \u{2018}trits\u{2019}, ternary digits that " +
-                    "can each have 3 values: \u{2018}/\u{2019}, \u{2018}|\u{2019} and " +
-                    "\u{2018}\\\u{2019}. The lowest value is \u{2018}\\\u{2019}, the center " +
+                    "can each have 3 values. The lowest value is \u{2018}\\\u{2019}, the center " +
                     "value is \u{2018}|\u{2019} and the highest value is \u{2018}/\u{2019}. " +
                     "You can think of these as representing 0, 1, and 2, but there are " +
                     "other (and perhaps more fitting) ways of thinking about them as well, " +
@@ -455,7 +475,7 @@ struct SettingsView: View {
                     "sign. In balanced ternary, this is different. You can think of it like " +
                     "using a compass: North and South are opposite directions, but neither " +
                     "of them is more fundamental than the other. In balanced ternary, you " +
-                    "can use a single digit to denote the North Pole, the South Pole and " +
+                    "can use a single digit to denote the North Pole, the South Pole or " +
                     "the equator (the balance point)."
                 )
 

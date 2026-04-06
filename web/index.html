@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ternary Clock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+</head>
+<body>
+  <!-- Main clock view -->
+  <div id="clock-view">
+    <canvas id="clock-canvas"></canvas>
+    <button id="info-btn" aria-label="Settings">i</button>
+  </div>
+
+  <!-- Settings view -->
+  <div id="settings-view" class="hidden">
+    <div class="settings-layout">
+
+      <div class="settings-left">
+        <div class="settings-clock-preview">
+          <canvas id="preview-canvas"></canvas>
+        </div>
+
+        <div class="settings-controls">
+          <label class="toggle-row">
+            <span>Show leading zeros</span>
+            <span class="toggle" id="toggle-zeros"><span class="toggle-thumb"></span></span>
+          </label>
+
+          <label class="toggle-row">
+            <span>Show decimal values</span>
+            <span class="toggle" id="toggle-decimal"><span class="toggle-thumb"></span></span>
+          </label>
+
+          <div class="picker-row" id="picker-balanced">
+            <button class="picker-option selected" data-value="unbalanced">Unbalanced</button>
+            <button class="picker-option" data-value="balanced">Balanced</button>
+          </div>
+
+          <button id="close-btn">Close settings</button>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-right">
+        <h2>Ternary Timekeeping</h2>
+
+        <p>This is a balanced ternary clock. It divides the day into 27 hours. Each of those is divided into 27 minutes, which are in turn divided into 27 seconds. This means that the ternary hour is a bit shorter than a standard hour, while the ternary minute is about twice as long as a standard minute. The ternary second lasts for about 4.4 standard seconds. This is quite close to what psychologists call the &lsquo;extended present&rsquo;, the duration of time we experience as &lsquo;now&rsquo;.</p>
+
+        <p>The display is made out of &lsquo;trits&rsquo;, ternary digits that can each have 3 values: &lsquo;/&rsquo;, &lsquo;|&rsquo; and &lsquo;\&rsquo;. The highest value is &lsquo;/&rsquo;, the center value is &lsquo;|&rsquo; and the lowest value is &lsquo;\&rsquo;. You can think of these as representing 0, 1, and 2, but there are other (and perhaps more fitting) ways of thinking about them as well, such as &lsquo;&minus;1, 0, +1&rsquo;, &lsquo;down, center, up&rsquo; or &lsquo;left, middle, right&rsquo;.</p>
+
+        <p>Unbalanced number systems, like the standard decimal system or the binary system that computers use, do not have a center value. Their most basic ingredients are 0 and 1, and negative numbers need a special sign. In balanced ternary, this is different. You can think of it like using a compass: North and South are opposite directions, but neither of them is more fundamental than the other. In balanced ternary, you can use a single digit to denote the North Pole, the South Pole and the equator (the balance point).</p>
+
+        <p>As you add more digits, you can describe your North&ndash;South position with increasing accuracy. This way of counting is very well suited for keeping track of things that rotate, like the passage of the day (which tracks the rotation of the Earth around its axis). In this clock, the day is divided into 19683 equal steps. At noon, all the digits are centered at &lsquo;|&rsquo;. At midnight, the display flips over from its highest value, &lsquo;///&middot;///&middot;///&rsquo; to its lowest value &lsquo;\\\&middot;\\\&middot;\\\&rsquo; and the next day begins.</p>
+
+        <p>Interestingly, the exact opposite of noon is not a &lsquo;tick&rsquo; of the clock but rather the moment halfway between the highest and lowest value. Midnight is a boundary that the clock approaches and then passes over but never quite lands on. This is a fundamental property of any balanced number system: there is only one precisely defined center, and on the opposite end of that is &lsquo;infinity&rsquo;, a value that cannot be expressed precisely as a number.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
