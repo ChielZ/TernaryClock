@@ -268,7 +268,7 @@ struct SettingsView: View {
                 }
             } else {
                 // iPhone: stacked, scrollable
-                ScrollView {
+                ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         clockPreview
                             .frame(height: useAnalogDisplay ? 250 : nil)
@@ -287,19 +287,25 @@ struct SettingsView: View {
     // MARK: Left panel (iPad)
 
     private var leftPanel: some View {
-        VStack(spacing: 0) {
-            clockPreview
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(clockBackground)
+        GeometryReader { geo in
+            let totalHeight = geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom
+            let halfHeight = totalHeight / 2
 
-            Rectangle()
-                .fill(uiFg.opacity(0.15))
-                .frame(height: 1)
-                .padding(.horizontal, 16)
-
-            controlsContent(compact: false)
-                .frame(maxHeight: .infinity)
+            VStack(spacing: 0) {
+                clockPreview
+                    .frame(height: halfHeight)
+                    .background(clockBackground)
+/*
+                Rectangle()
+                    .fill(uiFg.opacity(0.15))
+                    .frame(height: 1)
+                    .padding(.horizontal, 5)
+*/
+                controlsContent(compact: false, rowHeight: halfHeight / 8)
+                    .frame(height: halfHeight)
+            }
         }
+        .ignoresSafeArea()
     }
 
     // MARK: Clock preview
@@ -338,61 +344,84 @@ struct SettingsView: View {
 
     // MARK: Controls
 
-    private func controlsContent(compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private func controlsContent(compact: Bool, rowHeight: CGFloat = 0) -> some View {
+        Group {
             if compact {
-                // iPhone: hide/show controls to avoid blank space
-                if !useAnalogDisplay {
+                // iPhone: natural spacing, hide/show controls
+                VStack(alignment: .leading, spacing: 24) {
+                    if !useAnalogDisplay {
+                        Toggle("Show leading zeros", isOn: $showLeadingZeros)
+                            .toggleStyle(FlatToggleStyle(color: uiFg))
+                        Toggle("Show decimal values", isOn: $showDecimalValues)
+                            .toggleStyle(FlatToggleStyle(color: uiFg))
+
+                        if showDecimalValues {
+                            FlatPicker(
+                                selection: $useBalancedDecimal,
+                                options: [(false, "Unbalanced"), (true, "Balanced")],
+                                color: uiFg
+                            )
+                        }
+                    }
+
+                    Text("Color")
+                    colorSelector
+
+                    Toggle("Invert", isOn: $invertColors)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
+                    Toggle("Analog display", isOn: $useAnalogDisplay)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
+
+                    Text("tap clock to close settings screen")
+                        .font(.custom("Comfortaa", size: 14))
+                        .foregroundStyle(uiFg.opacity(0.5))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .padding(24)
+            } else {
+                // iPad: evenly distributed rows
+                VStack(alignment: .leading, spacing: 0) {
                     Toggle("Show leading zeros", isOn: $showLeadingZeros)
                         .toggleStyle(FlatToggleStyle(color: uiFg))
+                        .opacity(useAnalogDisplay ? 0 : 1)
+                        .allowsHitTesting(!useAnalogDisplay)
+                        .frame(height: rowHeight)
                     Toggle("Show decimal values", isOn: $showDecimalValues)
                         .toggleStyle(FlatToggleStyle(color: uiFg))
+                        .opacity(useAnalogDisplay ? 0 : 1)
+                        .allowsHitTesting(!useAnalogDisplay)
+                        .frame(height: rowHeight)
 
-                    if showDecimalValues {
-                        FlatPicker(
-                            selection: $useBalancedDecimal,
-                            options: [(false, "Unbalanced"), (true, "Balanced")],
-                            color: uiFg
-                        )
-                    }
+                    FlatPicker(
+                        selection: $useBalancedDecimal,
+                        options: [(false, "Unbalanced"), (true, "Balanced")],
+                        color: uiFg
+                    )
+                    .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
+                    .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
+                    .frame(height: rowHeight)
+
+                    Text("Color")
+                        .frame(height: rowHeight)
+                    colorSelector
+                        .frame(height: rowHeight)
+
+                    Toggle("Invert", isOn: $invertColors)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
+                        .frame(height: rowHeight)
+                    Toggle("Analog display", isOn: $useAnalogDisplay)
+                        .toggleStyle(FlatToggleStyle(color: uiFg))
+                        .frame(height: rowHeight)
+
+                    Text("tap clock to close settings screen")
+                        .font(.custom("Comfortaa", size: 14))
+                        .foregroundStyle(uiFg.opacity(0.5))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(height: rowHeight)
                 }
-            } else {
-                // iPad: use opacity to reserve space
-                Toggle("Show leading zeros", isOn: $showLeadingZeros)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-                    .opacity(useAnalogDisplay ? 0 : 1)
-                    .allowsHitTesting(!useAnalogDisplay)
-                Toggle("Show decimal values", isOn: $showDecimalValues)
-                    .toggleStyle(FlatToggleStyle(color: uiFg))
-                    .opacity(useAnalogDisplay ? 0 : 1)
-                    .allowsHitTesting(!useAnalogDisplay)
-
-                FlatPicker(
-                    selection: $useBalancedDecimal,
-                    options: [(false, "Unbalanced"), (true, "Balanced")],
-                    color: uiFg
-                )
-                .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
-                .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
+                .padding(.horizontal, 24)
             }
-
-            Text("Color")
-            colorSelector
-
-            Toggle("Invert", isOn: $invertColors)
-                .toggleStyle(FlatToggleStyle(color: uiFg))
-            Toggle("Analog display", isOn: $useAnalogDisplay)
-                .toggleStyle(FlatToggleStyle(color: uiFg))
-
-            Button(action: onClose) {
-                Text("Close settings")
-                    .font(.custom("Comfortaa", size: 16))
-                    .foregroundStyle(uiFg.opacity(1))
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.top, 8)
         }
-        .padding(24)
     }
 
     // MARK: Color selector
@@ -424,7 +453,7 @@ struct SettingsView: View {
     // MARK: Right panel
 
     private var rightPanel: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Ternary Timekeeping")
                     .font(.custom("Comfortaa", size: 24).weight(.bold))
@@ -440,7 +469,7 @@ struct SettingsView: View {
                     "This clock divides the day into 27 hours. Each hour is divided into " +
                     "27 minutes, which are in turn divided into 27 seconds. This means " +
                     "that the ternary hour is a bit shorter than a standard hour (because " +
-                    "there are now more hours in the day: 27 instead of 24), while the " +
+                    "there are more hours in the day: 27 instead of 24), while the " +
                     "ternary minute is about twice as long as a standard minute (because " +
                     "there are fewer minutes per hour: only 27 instead of 60)."
                 )
@@ -485,7 +514,7 @@ struct SettingsView: View {
                     "As you add more digits, you can describe your North\u{2013}South " +
                     "position with increasing accuracy. This way of counting is very well " +
                     "suited for keeping track of things that rotate, like the passage of " +
-                    "the day (which tracks the rotation of the Earth around its axis). " +
+                    "the day, which tracks the rotation of the Earth around its axis. " +
                     "At noon, all the digits on this clock are centered at " +
                     "\u{2018}|\u{2019}. At midnight, the display flips over from its " +
                     "highest value, \u{2018}///\u{00B7}///\u{00B7}///\u{2019} to its lowest " +
