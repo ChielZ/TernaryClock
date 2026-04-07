@@ -72,7 +72,7 @@ struct ColorPalette {
         ("Amber Glow", "F8A036"),
     ]
 
-    static let defaultIndex = 4 // White Sand
+    static let defaultIndex = 4 // Light Bronze
 
     static func color(at index: Int) -> Color {
         Color(hex: entries[index].hex)
@@ -282,23 +282,6 @@ struct SettingsView: View {
         .font(.custom("Comfortaa", size: 16))
         .foregroundStyle(uiFg)
         .tint(uiFg)
-        .onAppear { configureControlAppearance() }
-    }
-
-    private func configureControlAppearance() {
-        let fg = UIColor(uiFg)
-
-        let seg = UISegmentedControl.appearance()
-        seg.selectedSegmentTintColor = fg.withAlphaComponent(0.25)
-        seg.setTitleTextAttributes([
-            .foregroundColor: fg,
-            .font: UIFont(name: "Comfortaa", size: 16) ?? .systemFont(ofSize: 16)
-        ], for: .normal)
-        seg.setTitleTextAttributes([
-            .foregroundColor: fg,
-            .font: UIFont(name: "Comfortaa", size: 16) ?? .systemFont(ofSize: 16)
-        ], for: .selected)
-        seg.backgroundColor = fg.withAlphaComponent(0.08)
     }
 
     // MARK: Left panel (iPad)
@@ -366,11 +349,11 @@ struct SettingsView: View {
                         .toggleStyle(FlatToggleStyle(color: uiFg))
 
                     if showDecimalValues {
-                        Picker("Notation", selection: $useBalancedDecimal) {
-                            Text("Unbalanced").tag(false)
-                            Text("Balanced").tag(true)
-                        }
-                        .pickerStyle(.segmented)
+                        FlatPicker(
+                            selection: $useBalancedDecimal,
+                            options: [(false, "Unbalanced"), (true, "Balanced")],
+                            color: uiFg
+                        )
                     }
                 }
             } else {
@@ -384,11 +367,11 @@ struct SettingsView: View {
                     .opacity(useAnalogDisplay ? 0 : 1)
                     .allowsHitTesting(!useAnalogDisplay)
 
-                Picker("Notation", selection: $useBalancedDecimal) {
-                    Text("Unbalanced").tag(false)
-                    Text("Balanced").tag(true)
-                }
-                .pickerStyle(.segmented)
+                FlatPicker(
+                    selection: $useBalancedDecimal,
+                    options: [(false, "Unbalanced"), (true, "Balanced")],
+                    color: uiFg
+                )
                 .opacity(showDecimalValues && !useAnalogDisplay ? 1 : 0)
                 .allowsHitTesting(showDecimalValues && !useAnalogDisplay)
             }
@@ -448,24 +431,43 @@ struct SettingsView: View {
                     .padding(.bottom, 4)
 
                 infoParagraph(
-                    "This is a balanced ternary clock. It divides the day into 27 hours. " +
-                    "Each of the hours is divided into 27 minutes, which are in turn divided " +
-                    "into 27 seconds. This means that the ternary hour is a bit shorter " +
-                    "than a standard hour, while the ternary minute is about twice as long " +
-                    "as a standard minute. The ternary second lasts for about 4.4 standard " +
-                    "seconds. This is quite close to what psychologists call the " +
-                    "\u{2018}extended present\u{2019}, the duration of time we experience " +
-                    "as \u{2018}now\u{2019}."
+                    "This is a balanced ternary clock. It goes around once a day just like " +
+                    "a regular digital clock, but it works a little differently: the time " +
+                    "it keeps is based on divisions of three."
                 )
 
                 infoParagraph(
-                    "The display is made out of \u{2018}trits\u{2019}, ternary digits that " +
-                    "can each have 3 values. The lowest value is \u{2018}\\\u{2019}, the center " +
-                    "value is \u{2018}|\u{2019} and the highest value is \u{2018}/\u{2019}. " +
-                    "You can think of these as representing 0, 1, and 2, but there are " +
-                    "other (and perhaps more fitting) ways of thinking about them as well, " +
-                    "such as \u{2018}\u{2212}1, 0, +1\u{2019}, \u{2018}down, center, " +
-                    "up\u{2019} or \u{2018}left, middle, right\u{2019}."
+                    "This clock divides the day into 27 hours. Each hour is divided into " +
+                    "27 minutes, which are in turn divided into 27 seconds. This means " +
+                    "that the ternary hour is a bit shorter than a standard hour (because " +
+                    "there are now more hours in the day: 27 instead of 24), while the " +
+                    "ternary minute is about twice as long as a standard minute (because " +
+                    "there are fewer minutes per hour: only 27 instead of 60)."
+                )
+                
+                infoParagraph(
+                    "The ternary second lasts about 4.4 standard seconds. This is quite close to the " +
+                    "duration of time we experience as \u{2018}now\u{2019}, sometimes called " +
+                    "the \u{2018}extended present\u{2019}. So in a sense, this clock really " +
+                    "ticks off \u{2018}moments\u{2019} one by one."
+                )
+
+                infoParagraph(
+                    "The clock display is made out of \u{2018}trits\u{2019}, ternary " +
+                    "digits that can each have 3 values. The lowest value is " +
+                    "\u{2018}\\\u{2019}, the center value is \u{2018}|\u{2019} and the " +
+                    "highest value is \u{2018}/\u{2019}. You can think of these as " +
+                    "representing 0, 1, and 2, but there are other (and perhaps more " +
+                    "fitting) ways of thinking about them as well, such as " +
+                    "\u{2018}\u{2212}1, 0, +1\u{2019}, \u{2018}down, center, up\u{2019} " +
+                    "or \u{2018}left, middle, right\u{2019}."
+                )
+                
+                infoParagraph(
+                    "Each segment of the display " +
+                    "(hours, minutes and seconds) is made up of three individual trits. " +
+                    "Together these combine to give 27 (3\u{00D7}3\u{00D7}3) possible " +
+                    "values. With 9 trits in total, the day is divided into 19683 equal steps."
                 )
 
                 infoParagraph(
@@ -483,12 +485,12 @@ struct SettingsView: View {
                     "As you add more digits, you can describe your North\u{2013}South " +
                     "position with increasing accuracy. This way of counting is very well " +
                     "suited for keeping track of things that rotate, like the passage of " +
-                    "the day (which tracks the rotation of the Earth around its axis). In " +
-                    "this clock, the day is divided into 19683 equal steps. At noon, all " +
-                    "the digits are centered at \u{2018}|\u{2019}. At midnight, the display " +
-                    "flips over from its highest value, \u{2018}///\u{00B7}///\u{00B7}///\u{2019} " +
-                    "to its lowest value \u{2018}\\\\\\\u{00B7}\\\\\\\u{00B7}\\\\\\\u{2019} " +
-                    "and the next day begins."
+                    "the day (which tracks the rotation of the Earth around its axis). " +
+                    "At noon, all the digits on this clock are centered at " +
+                    "\u{2018}|\u{2019}. At midnight, the display flips over from its " +
+                    "highest value, \u{2018}///\u{00B7}///\u{00B7}///\u{2019} to its lowest " +
+                    "value \u{2018}\\\\\\\u{00B7}\\\\\\\u{00B7}\\\\\\\u{2019} and the " +
+                    "next day begins."
                 )
 
                 infoParagraph(
@@ -780,6 +782,37 @@ struct DecimalReadoutView: View {
         } else {
             return "\(value + 13)"
         }
+    }
+}
+
+// MARK: - Flat Picker
+
+/// A flat segmented picker matching the toggle style — no UIKit, no 3D effects.
+struct FlatPicker<T: Hashable>: View {
+    @Binding var selection: T
+    let options: [(value: T, label: String)]
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
+                Text(option.label)
+                    .font(.custom("Comfortaa", size: 14))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        selection == option.value
+                            ? color.opacity(0.25)
+                            : color.opacity(0.08)
+                    )
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selection = option.value
+                        }
+                    }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
