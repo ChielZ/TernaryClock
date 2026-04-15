@@ -211,22 +211,33 @@ updatePickerVisibility();
 
 // ---- Render Loop ----
 
-const TICK_INTERVAL = (TERNARY_SECOND / 27) * 1000; // sub-second tick in ms (~163ms)
+const TICK_INTERVAL = TERNARY_SECOND / 27; // sub-second tick in seconds (~0.163s)
+let lastTick = -1;
 
-function tick() {
-  const time = getTernaryTime();
-  const opts = {
-    showLeadingZeros: state.showLeadingZeros,
-    showDecimal: state.showDecimal,
-    useBalanced: state.useBalanced,
-  };
+function loop() {
+  // Quantize current time to sub-second ticks
+  const now = Date.now() / 1000;
+  const currentTick = Math.floor(now / TICK_INTERVAL);
 
-  drawClock(clockCanvas, time, opts);
+  // Only redraw when we've entered a new tick
+  if (currentTick !== lastTick) {
+    lastTick = currentTick;
 
-  if (state.settingsOpen) {
-    drawClock(previewCanvas, time, opts);
+    const time = getTernaryTime();
+    const opts = {
+      showLeadingZeros: state.showLeadingZeros,
+      showDecimal: state.showDecimal,
+      useBalanced: state.useBalanced,
+    };
+
+    drawClock(clockCanvas, time, opts);
+
+    if (state.settingsOpen) {
+      drawClock(previewCanvas, time, opts);
+    }
   }
+
+  requestAnimationFrame(loop);
 }
 
-setInterval(tick, TICK_INTERVAL);
-tick();
+requestAnimationFrame(loop);
